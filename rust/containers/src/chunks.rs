@@ -4,6 +4,7 @@ use std::mem;
 use std::fmt;
 use core::slice;
 use std::ops::{Index, IndexMut};
+use std::fmt::Display;
 
 type Layout = alloc::Layout;
 
@@ -14,6 +15,7 @@ fn array_layout<T>(count: usize) -> Layout {
     layout
 }
 
+// TODO Add Option for error case
 fn array_alloc<T>(count: usize) -> *mut T {
     let layout = array_layout::<T>(count);
 
@@ -49,19 +51,60 @@ fn array_dealloc<T>(ptr: *mut T, count: usize) {
 }
 
 
-pub struct Chunks<T, const BOUNDS_CHECK: bool = true, const AUTO_DROP: bool = true>
-where
-    T: Copy
+pub struct Chunks<T: Clone, const BOUNDS_CHECK: bool = true>
 {
     pub ptr: *mut T,
     pub count: usize,
 }
 
 impl<
-    T: Copy,
+    T: Copy + Clone,
     const BC: bool,
-    const AD: bool,
-> Chunks<T, BC, AD> {
+> Chunks<T, BC> {
+
+    pub fn memset_copy(&mut self, value: T) {
+        for i in 0..self.count {
+            // ptr::write(self.ptr.add(i), value);
+            self[i] = value;
+        }
+    }
+
+    // Constructor
+    pub fn filled_copy(value: T, count: usize) -> Self {
+        let mut c: Self = Self::alloc(count);
+        c.memset_copy(value);
+        c
+    }
+}
+
+impl<
+    T: Clone + Display,
+    const BC: bool,
+> Chunks<T, BC> {
+    pub fn memset_clone(&mut self, value: T) {
+        for i in 0..self.count {
+            // Err: invalid memory reference
+            // self[i] = value.clone();
+
+            self.write_ptr(i, value.clone());
+        }
+    }
+
+    // Constructor
+    // TODO Can we reuse one by another
+    pub fn filled_clone(value: T, count: usize) -> Self {
+        let mut c: Self = Self::alloc(count);
+        c.memset_clone(value);
+        c
+    }
+
+}
+
+
+impl<
+    T: Clone,
+    const BC: bool,
+> Chunks<T, BC> {
     // Constructor
     pub fn alloc(count: usize) -> Self {
         Self {
@@ -70,22 +113,16 @@ impl<
         }
     }
 
-    // Constructor
     pub fn from_slice(from: &[T]) -> Self {
-        let _self: Self = Self::alloc(from.len());
-        for i in 0..from.len() {
+        let count: usize = from.len();
+        let _self = Self::alloc(count);
+
+        if count > 0 {
             unsafe {
-                _self.ptr.add(i).write(from[i]);
+                ptr::copy(from.as_ptr(), _self.ptr, count)
             }
         }
         _self
-    }
-
-    // Constructor
-    pub fn filled(value: T, count: usize) -> Self {
-        let mut c: Self = Self::alloc(count);
-        c.memset(value);
-        c
     }
 
     pub fn dealloc(&mut self) {
@@ -117,13 +154,6 @@ impl<
 
     pub fn allocated(&self) -> bool {
         !self.ptr.is_null() && self.count > 0
-    }
-
-    pub fn memset(&mut self, value: T) {
-        for i in 0..self.count {
-            // ptr::write(self.ptr.add(i), value);
-            self[i] = value;
-        }
     }
 
     pub fn as_ptr(&self) -> *const T {
@@ -163,19 +193,61 @@ impl<
         }
     }
 
-    fn get(&self, index: usize) -> Result<&T, &'static str> {
+
+    /// Replaces mutable acces via index like `self.data[self.len] = elem`
+    /// by providing an access to an element via pointer `*mut T`
+    /// rather than reference `&mut T`
+    ///
+    /// This is made for objects with custom Drop trait (such as String):
+    /// Trying to overwrite memory location by `&T` reference (returned by index_mut)
+    /// causes invokation of drop().
+    /// But this is unwanted behaviour for memory without an actual object
+    /// and will lead to "invalid memory reference" error in this case.
+    pub fn write_ptr(&mut self, index: usize, value: T) {
+        // TODO match
+        let p: *mut T = self.get_mut_ptr(index).unwrap();
+        unsafe {
+            p.write(value);
+        }
+    }
+
+    // === PRIVATE ===
+    fn get_ptr(&self, index: usize) -> Result<*const T, &'static str> {
         // Safety: Out-of-bounds is checked
         if self.bounds(index) {
             unsafe {
-                // TODO Maybe return by reference?
-                // Does &mut *... is a borrowing, i.e. moving?
-                // Looks like overhead of moving twice
-                Ok(&*self.ptr.add(index))
+                Ok(self.ptr.add(index) as *const T)
             }
         } else {
             Err("Index out of bounds")
         }
     }
+
+    fn get_mut_ptr(&mut self, index: usize) -> Result<*mut T, &'static str> {
+        // Safety: Out-of-bounds is checked
+        if self.bounds(index) {
+            unsafe {
+                Ok(self.ptr.add(index))
+            }
+        } else {
+            Err("Index out of bounds")
+        }
+    }
+
+    //
+    //fn get(&self, index: usize) -> Result<&T, &'static str> {
+    //    // Safety: Out-of-bounds is checked
+    //    if self.bounds(index) {
+    //        unsafe {
+    //            // TODO Maybe return by reference?
+    //            // Does &mut *... is a borrowing, i.e. moving?
+    //            // Looks like overhead of moving twice
+    //            Ok(&*self.ptr.add(index))
+    //        }
+    //    } else {
+    //        Err("Index out of bounds")
+    //    }
+    //}
 
     fn get_mut(&mut self, index: usize) -> Result<&mut T, &'static str> {
         // TODO Check overheads of such solution
@@ -199,42 +271,50 @@ impl<
 }
 
 // ================== INDEX & INDEX_MUT ==================
+// TODO Seems that cannot use self[i] = string1; // (String)
+// Because returning a reference to a non-existing type value
 
 impl<
-    T: Copy,
+    T: Clone,
     const BC: bool,
-    const AD: bool,
-> Index<usize> for Chunks<T, BC, AD> {
+> Index<usize> for Chunks<T, BC> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.get(index).unwrap()
+        unsafe {
+            &*self.get_ptr(index).unwrap()
+        }
     }
 }
 
 impl<
-    T: Copy,
+    T: Clone,
     const BC: bool,
-    const AD: bool,
-> IndexMut<usize> for Chunks<T, BC, AD> {
+> IndexMut<usize> for Chunks<T, BC> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.get_mut(index).unwrap()
+        unsafe {
+            &mut *self.get_mut_ptr(index).unwrap()
+        }
     }
 }
 
 // ================== FMT ==================
 
 impl<
-    T: fmt::Display + Copy,
+    T: Display + Clone,
     const BC: bool,
-    const AD: bool,
-> fmt::Debug for Chunks<T, BC, AD> {
+> fmt::Debug for Chunks<T, BC> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Chunks: [");
-        for i in 0..self.count + 20 {
-            if i > 0 { write!(f, ", "); }
-            let val: T = unsafe { self.ptr.add(i).read() };
-            write!(f, "{}", val);
+        write!(f, "Chunks: [").unwrap();
+        for i in 0..self.count {
+
+            if i > 0 {
+                write!(f, ", ").unwrap();
+            }
+            let val: T = unsafe {
+                self.ptr.add(i).read()
+            };
+            write!(f, "{}", val).unwrap();
         }
         write!(f, "]")
     }
@@ -243,12 +323,11 @@ impl<
 // ================== DROP ==================
 
 impl<
-    T: Copy,
+    T: Clone,
     const BC: bool,
-    const AD: bool,
-> Drop for Chunks<T, BC, AD> {
+> Drop for Chunks<T, BC> {
     fn drop(&mut self) {
-        if self.allocated() && AD {
+        if self.allocated() {
             self.dealloc();
         }
     }

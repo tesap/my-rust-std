@@ -5,18 +5,33 @@ use std::ops::{Deref, DerefMut};
 use crate::chunks as my;
 
 #[derive(Debug)]
-pub struct Vector<T: Display + Copy> {
+pub struct Vector<T: Display + Clone> {
     data: my::Chunks<T>,
     pub len: usize,
 }
 
-impl<T: Display + Copy> Vector<T> {
+
+impl<T: Display + Clone + Copy> Vector<T> {
     // Constructor
-    pub fn new(value: T, len: usize) -> Self {
+    pub fn new_copy(value: T, len: usize) -> Self {
         // Allocate at least something
         let capacity = if len > 0 { len } else { 1 };
 
-        let chunks = my::Chunks::filled(value, capacity);
+        let chunks = my::Chunks::filled_copy(value, capacity);
+        Vector {
+            data: chunks,
+            len: len
+        }
+    }
+}
+
+impl<T: Display + Clone> Vector<T> {
+    // Constructor
+    pub fn new_clone(value: T, len: usize) -> Self {
+        // Allocate at least something
+        let capacity = if len > 0 { len } else { 1 };
+
+        let chunks: my::Chunks<T> = my::Chunks::filled_clone(value, capacity);
         Vector {
             data: chunks,
             len: len
@@ -28,6 +43,17 @@ impl<T: Display + Copy> Vector<T> {
         Self {
             data: my::Chunks::from_slice(from),
             len: from.len()
+        }
+    }
+
+    // Constructor
+    pub fn from_raw_parts(ptr: *mut T, len: usize, capacity: usize) -> Self {
+        Self {
+            data: my::Chunks {
+                ptr: ptr,
+                count: capacity,
+            },
+            len: len
         }
     }
 
@@ -72,7 +98,7 @@ impl<T: Display + Copy> Vector<T> {
             self.data.grow(1);
         }
 
-        self.data[self.len] = elem;
+        self.data.write_ptr(self.len, elem);
         self.len += 1;
         true
     }
@@ -96,7 +122,8 @@ impl<T: Display + Copy> Vector<T> {
             );
         }
 
-        self.data[index] = elem;
+        // self.data[index] = elem;
+        self.data.write_ptr(index, elem);
         self.len += 1;
         true
     }
@@ -104,7 +131,9 @@ impl<T: Display + Copy> Vector<T> {
     pub fn pop(&mut self) -> Option<T> {
         if self.len > 0 {
             self.len -= 1;
-            Some(self.data[self.len])
+            // Interesting: we can copy by reference, this is done automatically by compiler
+            // (bad design!)
+            Some(self.data[self.len].clone())
         } else {
             None
         }
@@ -136,7 +165,7 @@ pub trait ConsecConstrucor {
     fn consec(len: usize) -> Self;
 }
 
-impl<T: Display + Copy + From<usize>> ConsecConstrucor for Vector<T> {
+impl<T: Display + From<usize> + Clone> ConsecConstrucor for Vector<T> {
     // Constructor
     fn consec(len: usize) -> Self {
         let mut obj = Self {
@@ -157,7 +186,7 @@ impl<T: Display + Copy + From<usize>> ConsecConstrucor for Vector<T> {
 // ======== INDEX ========
 
 impl<
-    T: Display + Copy,
+    T: Display + Clone,
 > Index<usize> for Vector<T> {
     type Output = T;
 
@@ -171,7 +200,7 @@ impl<
 }
 
 impl<
-    T: Display + Copy,
+    T: Display + Clone,
 > IndexMut<usize> for Vector<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         if !self.bounds(index) {
@@ -185,7 +214,7 @@ impl<
 // ======== DEREF ========
 // Automatically implements iter(). How it works?
 
-impl<T: Display + Copy> Deref for Vector<T> {
+impl<T: Display + Clone> Deref for Vector<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
@@ -193,7 +222,7 @@ impl<T: Display + Copy> Deref for Vector<T> {
     }
 }
 
-impl<T: Display + Copy> DerefMut for Vector<T> {
+impl<T: Display + Clone> DerefMut for Vector<T> {
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }

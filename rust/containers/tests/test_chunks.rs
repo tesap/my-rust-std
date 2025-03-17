@@ -12,8 +12,6 @@ macro_rules! test_parametrized {
 mod tests {
     use containers::chunks::Chunks;
     use assert_panic::assert_panic;
-    use std::alloc;
-    use std::ptr;
     use std::mem;
 
     #[test]
@@ -27,14 +25,14 @@ mod tests {
 
     #[test]
     fn test_from_slice() {
-        //                        How does it look on IR level?
+        // TODO                   How does it look on IR level?
         Chunks::<u8>::from_slice(&[1, 2, 3, 4, 5]);
     }
 
     #[test]
     fn test_memset() {
         let mut chunks = Chunks::<u32>::alloc(5);
-        chunks.memset(42);
+        chunks.memset_copy(42);
         for i in 0..5 {
             unsafe {
                 assert_eq!(*chunks.ptr.add(i), 42);
@@ -45,7 +43,7 @@ mod tests {
     #[test]
     fn test_index() {
         let mut chunks = Chunks::<u32>::alloc(3);
-        chunks.memset(10);
+        chunks.memset_copy(10);
         assert_eq!(chunks[0], 10);
         assert_eq!(chunks[1], 10);
         assert_eq!(chunks[2], 10);
@@ -54,7 +52,7 @@ mod tests {
     #[test]
     fn test_index_out_of_bounds() {
         let mut chunks = Chunks::<u32>::alloc(3);
-        chunks.memset(10);
+        chunks.memset_copy(10);
         assert_eq!(chunks[0], 10);
         assert_eq!(chunks[1], 10);
         assert_eq!(chunks[2], 10);
@@ -64,7 +62,7 @@ mod tests {
     #[test]
     fn test_index_mut() {
         let mut chunks = Chunks::<u32>::alloc(3);
-        chunks.memset(5);
+        chunks.memset_copy(5);
         chunks[1] = 99;
         assert_eq!(chunks[1], 99);
     }
@@ -77,10 +75,10 @@ mod tests {
         let VALUE: T = 100.into();
         let size_factor: usize = mem::size_of::<T>() / mem::size_of::<u8>();
         let mut chunks = Chunks::<T>::alloc(SIZE);
-        chunks.memset(VALUE.into());
+        chunks.memset_copy(VALUE.into());
         assert_eq!(chunks[0], VALUE);
 
-        let chunks_view: Chunks::<T, false, false> = Chunks {
+        let chunks_view: Chunks::<T, false> = Chunks {
             ptr: chunks.ptr,
             count: chunks.count
         };
@@ -88,11 +86,11 @@ mod tests {
          * Check that no further allocation happenned out of bounds
          */
         assert_ne!(chunks_view[chunks.count], VALUE);
+        mem::forget(chunks_view);
 
         let ptr = chunks.ptr as *mut u8;
         // BOUNDS_CHECK = false : Turn off as needed to exceed bounds intentionally further
-        // AUTO_DROP = false : Double-free is possible, so do not treat it as allocated
-        let chunks2: Chunks<u8, false, false> = Chunks {
+        let chunks2: Chunks<u8, false> = Chunks {
             ptr: ptr,
             count: SIZE * size_factor,
         };
@@ -108,6 +106,8 @@ mod tests {
                 assert_eq!(<u8 as Into<T>>::into(chunks2[i]), 0.into(), "(i: {i}) Rest part of chunk is to be 0");
             }
         });
+        // DROP = false : Double-free is possible, so do not treat it as allocated
+        mem::forget(chunks2);
     }
 
     test_parametrized!(test_reinterpret, test_reinterpret_u8, u8);
@@ -119,9 +119,8 @@ mod tests {
 
     #[test]
     fn test_chunks_to_vec() {
-        let mut chunks;
+        let chunks = Chunks::<u8, false>::filled_copy(1, 3);
         let mut v = unsafe {
-            chunks = Chunks::<u8, false, false>::filled(1, 3);
             Vec::from_raw_parts(
                 chunks.ptr,
                 chunks.count,
@@ -129,9 +128,7 @@ mod tests {
             )
         };
 
-        unsafe {
-            assert_eq!(v.as_mut_ptr(), chunks.ptr);
-        }
+        assert_eq!(v.as_mut_ptr(), chunks.ptr);
 
         v[0] = 10;
         v.push(20);
@@ -144,14 +141,13 @@ mod tests {
         v.shrink_to_fit();
         v.push(21);
 
-        // Is it guaranteed?
-        unsafe {
-            assert_eq!(v.as_mut_ptr(), chunks.ptr);
-        }
+        // TODO Is it guaranteed?
+        assert_eq!(v.as_mut_ptr(), chunks.ptr);
 
         for i in 0..v.len() {
             assert_eq!(v[i], chunks[i]);
         }
+        mem::forget(chunks);
     }
 
     #[test]
@@ -167,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_as_slice() {
-        let mut chunks = Chunks::<u8>::filled(1, 3);
+        let mut chunks = Chunks::<u8>::filled_copy(1, 3);
         // What is &[...] notation? Does it create object on memory?
         assert_eq!(chunks.as_slice(), &[1, 1, 1]);
 
@@ -178,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_as_ptr() {
-        let mut chunks = Chunks::<u8>::filled(1, 3);
+        let chunks = Chunks::<u8>::filled_copy(1, 3);
         let ptr: *const u8 = chunks.as_ptr();
 
         unsafe {
@@ -190,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_as_mut_ptr() {
-        let mut chunks = Chunks::<u8>::filled(1, 3);
+        let chunks = Chunks::<u8>::filled_copy(1, 3);
         let ptr: *mut u8 = chunks.as_mut_ptr();
 
         unsafe {
@@ -207,7 +203,7 @@ mod tests {
     #[test]
     fn test_as_array() {
         let mut chunks = Chunks::<u32>::alloc(3);
-        chunks.memset(7);
+        chunks.memset_copy(7);
         let array: &[u32; 3] = chunks.as_array::<3>().unwrap();
         // unsafe {
         //     // Referencing array results slice (what?)

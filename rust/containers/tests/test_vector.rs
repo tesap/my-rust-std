@@ -8,7 +8,7 @@ mod tests {
 
     #[test]
     fn test_pop_till_empty() {
-        let mut v = Vector::new(1, 3);
+        let mut v = Vector::new_copy(1, 3);
         assert_eq!(v.pop(), Some(1));
         assert_eq!(v.len, 2);
         assert_eq!(v.pop(), Some(1));
@@ -20,7 +20,7 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut v = Vector::new(10, 5);
+        let mut v = Vector::new_copy(10, 5);
         assert_eq!(v.insert(6, 0), false);
         assert_eq!(v.insert(7, 0), false);
         assert_eq!(v.insert(3, 100), true);
@@ -30,13 +30,13 @@ mod tests {
 
     #[test]
     fn test_insert_out_of_bounds() {
-        let mut v = Vector::new(10, 5);
+        let mut v = Vector::new_copy(10, 5);
         assert_false!(v.insert(v.len, 100));
     }
 
     #[test]
     fn test_push_multiple() {
-        let mut v = Vector::new(10, 5);
+        let mut v = Vector::new_copy(10, 5);
 
         assert_eq!(v.push(100), true);
         assert_eq!(v.len, 6);
@@ -51,13 +51,13 @@ mod tests {
 
     #[test]
     fn test_push_empty() {
-        let mut v = Vector::new(0, 0);
+        let mut v = Vector::new_copy(0, 0);
         assert_eq!(v.push(1), true);
     }
 
     #[test]
     fn test_as_slice() {
-        let mut v = Vector::new(1, 5);
+        let mut v = Vector::new_copy(1, 5);
         assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1]);
 
         v.push(10);
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_as_ptr() {
-        let mut v = Vector::new(1, 5);
+        let mut v = Vector::new_copy(1, 5);
         v[0] = 10;
         v[1] = 20;
         v[2] = 30;
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_as_mut_ptr() {
-        let mut v = Vector::new(1, 5);
+        let mut v = Vector::new_copy(1, 5);
         v[0] = 10;
         v[1] = 20;
         v[2] = 30;
@@ -129,13 +129,13 @@ mod tests {
 
     #[test]
     fn test_consec() {
-        let mut v: Vector<usize> = Vector::consec(10);
+        let v: Vector<usize> = Vector::consec(10);
         assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
 
     #[test]
     fn test_deref() {
-        let mut v: Vector<i32> = Vector::new(1, 5);
+        let v: Vector<i32> = Vector::new_copy(1, 5);
 
         // assert_eq!(&*v, &[1, 1, 1, 1, 1]);
         // let deref: [i32] = *v; // as [i32; 10];
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_deref_iter() {
-        let mut v: Vector<usize> = Vector::consec(5);
+        let v: Vector<usize> = Vector::consec(5);
 
         // How does it automatically gives iter()?
         let v2: Vec<usize> = v.iter()
@@ -156,5 +156,52 @@ mod tests {
             .collect();
 
         assert_eq!(v2.as_slice(), &[1, 4, 9, 16, 25]);
+    }
+
+    // ===== std containers
+    #[test]
+    fn test_std_string() {
+        // invalid memory reference
+        // let mut v: Vector<String> = Vector::new_clone(&"123".to_string(), 3);
+
+        // NEW
+        let s: String = "0000".to_string();
+        let mut v: Vector<String> = Vector::new_clone(s, 3);
+
+        // TODO Doesn't work
+        // FROM_SLICE
+        // v = Vector::from_slice(&["x", "y", "z"]);
+
+        // AS_SLICE
+        assert_eq!(v.as_slice(), &["0000", "0000", "0000"]);
+
+        // INDEX
+        assert_eq!(v[0], "0000");
+        assert_eq!(v[1], "0000");
+        assert_eq!(v[2], "0000");
+
+        // INDEX_MUT
+        v[1] = "1111".to_string();
+        assert_eq!(v.as_slice(), &["0000", "1111", "0000"]);
+
+        // PUSH
+        v.push("abcd".to_string());
+        assert_eq!(v.as_slice(), &["0000", "1111", "0000", "abcd"]);
+
+        // INSERT
+        v.insert(3, "ins".to_string());
+
+        // POP
+        assert_eq!(v.pop(), Some("abcd".to_string()));
+        assert_eq!(v.pop(), Some("ins".to_string()));
+        assert_eq!(v.pop(), Some("0000".to_string()));
+        assert_eq!(v.pop(), Some("1111".to_string()));
+        assert_eq!(v.pop(), Some("0000".to_string()));
+    }
+
+    #[test]
+    fn test_str() {
+        // FROM_SLICE
+        let v: Vector<&str> = Vector::from_slice(&["x", "y", "z"]);
     }
 }

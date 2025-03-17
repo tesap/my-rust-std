@@ -1,6 +1,4 @@
 use crate::vector as my;
-//use std::result::Result;
-
 
 // TODO Is it possible?
 //#[derive(ConstParamTy, PartialEq, Eq)]
@@ -27,6 +25,7 @@ pub struct Bytes<const BIG_ENDIAN: bool = true>{
 }
 
 
+// TODO Complete trait
 impl<const BE: bool> Bytes<BE> {
     pub fn to_bytes(&self) -> &[u8] {
         self.vec.as_slice()
@@ -36,7 +35,7 @@ impl<const BE: bool> Bytes<BE> {
         let s1 = size_of::<i128>();
         let s2 = self.vec.len_bytes();
 
-        if (s2 > s1) {
+        if s2 > s1 {
             return Err("Bytes length is too big".to_string());
         }
 
@@ -64,7 +63,7 @@ impl<const BE: bool> Bytes<BE> {
         let ptr: *const i64 = &from;
         //let reff: &i64 = &from;
         //let reff2: &i64 = &from;
-        let mut reff2: &mut i64 = &mut from;
+        let reff2: &mut i64 = &mut from;
 
 
         println!("ptr: {:?}", ptr);

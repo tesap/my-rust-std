@@ -2,7 +2,6 @@
 #[cfg(test)]
 mod tests {
     use containers::bytes2 as my;
-    use all_asserts::{assert_false};
 
     #[test]
     fn test_abc() {
