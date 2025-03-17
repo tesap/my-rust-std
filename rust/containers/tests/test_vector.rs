@@ -128,10 +128,27 @@ mod tests {
     }
 
     #[test]
+    fn test_debug() {
+        let v: Vector<u8> = Vector::new_copy(1, 5);
+        println!("Debug: {:?}", v);
+
+        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1]);
+
+        // IDEA: To combine different tests to test them in cominatin, while still testing 
+        // them separately
+        let v: Vector<String> = Vector::new_clone("123".to_string(), 5);
+        println!("Debug: {:?}", v);
+
+        assert_eq!(v.as_slice(), &["123", "123", "123", "123", "123"]);
+    }
+
+    #[test]
     fn test_consec() {
         let v: Vector<usize> = Vector::consec(10);
         assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
+
+    // DEREF TRAITS
 
     #[test]
     fn test_deref() {
@@ -158,6 +175,15 @@ mod tests {
         assert_eq!(v2.as_slice(), &[1, 4, 9, 16, 25]);
     }
 
+    #[test]
+    fn test_deref_join() {
+        let mut v: Vector<String> = Vector::new();
+        v.push("12".to_string());
+        v.push("34".to_string());
+        v.push("56".to_string());
+        assert_eq!(v.join("|"), "12|34|56");
+    }
+
     // ===== std containers
     #[test]
     fn test_std_string() {
@@ -174,6 +200,7 @@ mod tests {
 
         // AS_SLICE
         assert_eq!(v.as_slice(), &["0000", "0000", "0000"]);
+        assert_eq!(v.as_mut_slice(), &["0000", "0000", "0000"]);
 
         // INDEX
         assert_eq!(v[0], "0000");

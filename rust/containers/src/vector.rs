@@ -26,13 +26,20 @@ impl<T: Display + Clone + Copy> Vector<T> {
 }
 
 impl<T: Display + Clone> Vector<T> {
+    pub fn new() -> Self {
+        Self {
+            data: my::Chunks::alloc(1),
+            len: 0
+        }
+    }
+
     // Constructor
     pub fn new_clone(value: T, len: usize) -> Self {
         // Allocate at least something
         let capacity = if len > 0 { len } else { 1 };
 
         let chunks: my::Chunks<T> = my::Chunks::filled_clone(value, capacity);
-        Vector {
+        Self {
             data: chunks,
             len: len
         }
@@ -225,5 +232,19 @@ impl<T: Display + Clone> Deref for Vector<T> {
 impl<T: Display + Clone> DerefMut for Vector<T> {
     fn deref_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
+    }
+}
+
+// ======== ITERATOR ========
+
+impl<T: Display + Clone> FromIterator<T> for Vector<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+        let mut c = Self::new();
+
+        for i in iter {
+            c.push(i);
+        }
+
+        c
     }
 }

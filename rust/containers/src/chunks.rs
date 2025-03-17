@@ -100,6 +100,23 @@ impl<
 
 }
 
+impl<
+    T: Clone + Display,
+    const BC: bool,
+> Chunks<T, BC> {
+    pub fn from_slice(from: &[T]) -> Self {
+        let count: usize = from.len();
+        let c = Self::alloc(count);
+
+        if count > 0 {
+            unsafe {
+                ptr::copy(from.as_ptr(), c.ptr, count)
+            }
+        }
+        c
+    }
+}
+
 
 impl<
     T: Clone,
@@ -111,18 +128,6 @@ impl<
             ptr: array_alloc::<T>(count),
             count,
         }
-    }
-
-    pub fn from_slice(from: &[T]) -> Self {
-        let count: usize = from.len();
-        let _self = Self::alloc(count);
-
-        if count > 0 {
-            unsafe {
-                ptr::copy(from.as_ptr(), _self.ptr, count)
-            }
-        }
-        _self
     }
 
     pub fn dealloc(&mut self) {
@@ -311,10 +316,24 @@ impl<
             if i > 0 {
                 write!(f, ", ").unwrap();
             }
-            let val: T = unsafe {
-                self.ptr.add(i).read()
-            };
-            write!(f, "{}", val).unwrap();
+            // --> Works improperly; Seems that it frees a pointer obtained, and this cuases an
+            // --> issue for Clone types
+            // let val: T = unsafe {
+            //     self.ptr.add(i).read()
+            // };
+            // write!(f, "{}", val).unwrap();
+            //
+            // --> Needs to be added for it to work:
+            // std::mem::forget(val);
+
+            // --> Also doesn't work, because data may be zeroed
+            // write!(f, "{}", self[i]).unwrap();
+            // --> TODO Add check for whether current memory is assigned with values or not
+
+            // Safety: bounds are OK
+            unsafe {
+                write!(f, "{:}", self.get_ptr(i).unwrap().read()).unwrap();
+            }
         }
         write!(f, "]")
     }
