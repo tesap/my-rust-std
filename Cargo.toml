@@ -1,6 +1,6 @@
 [package]
 name = "tesap-std"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 description = "Reimplementation of Rust's common std containers"
 repository = "https://github.com/tesap/my-rust-std"
