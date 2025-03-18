@@ -128,21 +128,6 @@ mod tests {
     }
 
     #[test]
-    fn test_debug() {
-        let v: Vector<u8> = Vector::new_copy(1, 5);
-        println!("Debug: {:?}", v);
-
-        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1]);
-
-        // IDEA: To combine different tests to test them in cominatin, while still testing 
-        // them separately
-        let v: Vector<String> = Vector::new_clone("123".to_string(), 5);
-        println!("Debug: {:?}", v);
-
-        assert_eq!(v.as_slice(), &["123", "123", "123", "123", "123"]);
-    }
-
-    #[test]
     fn test_consec() {
         let v: Vector<usize> = Vector::consec(10);
         assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -194,10 +179,6 @@ mod tests {
         let s: String = "0000".to_string();
         let mut v: Vector<String> = Vector::new_clone(s, 3);
 
-        // TODO Doesn't work
-        // FROM_SLICE
-        // v = Vector::from_slice(&["x", "y", "z"]);
-
         // AS_SLICE
         assert_eq!(v.as_slice(), &["0000", "0000", "0000"]);
         assert_eq!(v.as_mut_slice(), &["0000", "0000", "0000"]);
@@ -224,11 +205,9 @@ mod tests {
         assert_eq!(v.pop(), Some("0000".to_string()));
         assert_eq!(v.pop(), Some("1111".to_string()));
         assert_eq!(v.pop(), Some("0000".to_string()));
-    }
 
-    #[test]
-    fn test_str() {
-        // FROM_SLICE
-        let v: Vector<&str> = Vector::from_slice(&["x", "y", "z"]);
+        // FROM_SLICE (CLONE)
+        let v2 = Vector::from_slice_clone(&["x".to_string(), "y".to_string(), "z".to_string()]);
+        assert_eq!(v2.as_slice(), &["x", "y", "z"]);
     }
 }

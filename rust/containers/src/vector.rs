@@ -23,6 +23,15 @@ impl<T: Display + Clone + Copy> Vector<T> {
             len: len
         }
     }
+
+    // Constructor
+    pub fn from_slice_copy(from: &[T]) -> Self {
+        Self {
+            data: my::Chunks::from_slice_copy(from),
+            len: from.len()
+        }
+    }
+
 }
 
 impl<T: Display + Clone> Vector<T> {
@@ -46,9 +55,9 @@ impl<T: Display + Clone> Vector<T> {
     }
 
     // Constructor
-    pub fn from_slice(from: &[T]) -> Self {
+    pub fn from_slice_clone(from: &[T]) -> Self {
         Self {
-            data: my::Chunks::from_slice(from),
+            data: my::Chunks::from_slice_clone(from),
             len: from.len()
         }
     }
@@ -86,15 +95,17 @@ impl<T: Display + Clone> Vector<T> {
         unsafe {
             std::slice::from_raw_parts(
                 self.as_ptr(),
+                // Bound by len, not by data.count
                 self.len
             )
         }
     }
 
-    pub fn as_mut_slice(&self) -> &mut [T] {
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         unsafe {
             std::slice::from_raw_parts_mut(
                 self.as_mut_ptr(),
+                // Bound by len, not by data.count
                 self.len
             )
         }
@@ -105,7 +116,7 @@ impl<T: Display + Clone> Vector<T> {
             self.data.grow(1);
         }
 
-        self.data.write_ptr(self.len, elem);
+        self.data.write_index(self.len, elem);
         self.len += 1;
         true
     }
@@ -130,7 +141,7 @@ impl<T: Display + Clone> Vector<T> {
         }
 
         // self.data[index] = elem;
-        self.data.write_ptr(index, elem);
+        self.data.write_index(index, elem);
         self.len += 1;
         true
     }

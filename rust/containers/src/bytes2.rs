@@ -129,7 +129,7 @@ impl<const BE: bool> Bytes<BE> {
 
     pub fn from_bytes(from: &[Byte]) -> Self {
         Self {
-            vec: my::Vector::from_slice(from)
+            vec: my::Vector::from_slice_copy(from)
         }
     }
 
@@ -154,7 +154,7 @@ impl<const BE: bool> Bytes<BE> {
         };
 
         Self {
-            vec: my::Vector::from_slice(slice)
+            vec: my::Vector::from_slice_copy(slice)
         }
     }
 

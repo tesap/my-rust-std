@@ -75,6 +75,20 @@ impl<
         c.memset_copy(value);
         c
     }
+
+    pub fn from_slice_copy(from: &[T]) -> Self {
+        let count: usize = from.len();
+        let c = Self::alloc(count);
+
+        // --> Would work, but only for Copy types
+        if count > 0 {
+            unsafe {
+                ptr::copy(from.as_ptr(), c.ptr, count)
+            }
+        }
+
+        c
+    }
 }
 
 impl<
@@ -86,7 +100,7 @@ impl<
             // Err: invalid memory reference
             // self[i] = value.clone();
 
-            self.write_ptr(i, value.clone());
+            self.write_index(i, value.clone());
         }
     }
 
@@ -104,15 +118,24 @@ impl<
     T: Clone + Display,
     const BC: bool,
 > Chunks<T, BC> {
-    pub fn from_slice(from: &[T]) -> Self {
+    pub fn from_slice_clone(from: &[T]) -> Self {
         let count: usize = from.len();
-        let c = Self::alloc(count);
+        let mut c = Self::alloc(count);
 
-        if count > 0 {
-            unsafe {
-                ptr::copy(from.as_ptr(), c.ptr, count)
-            }
+        // --> Doesn't work: String-like structs gets double freed
+        //if count > 0 {
+        //    unsafe {
+        //        ptr::copy(from.as_ptr(), c.ptr, count)
+        //    }
+        //}
+        // std::mem::forget(from.as_ptr());
+
+        for i in 0..count {
+            // We are obliged to clone
+            // Using write_index because memory is zeroed
+            c.write_index(i, from[i].clone())
         }
+
         c
     }
 }
@@ -183,7 +206,15 @@ impl<
     }
 
     pub fn as_slice(&self) -> &[T] {
-        unsafe { slice::from_raw_parts(self.ptr, self.count) }
+        unsafe {
+            slice::from_raw_parts(self.ptr, self.count)
+        }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        unsafe {
+            std::slice::from_raw_parts_mut(self.ptr, self.count)
+        }
     }
 
     pub fn indices(&self) -> std::ops::Range<usize> {
@@ -198,7 +229,6 @@ impl<
         }
     }
 
-
     /// Replaces mutable acces via index like `self.data[self.len] = elem`
     /// by providing an access to an element via pointer `*mut T`
     /// rather than reference `&mut T`
@@ -208,7 +238,7 @@ impl<
     /// causes invokation of drop().
     /// But this is unwanted behaviour for memory without an actual object
     /// and will lead to "invalid memory reference" error in this case.
-    pub fn write_ptr(&mut self, index: usize, value: T) {
+    pub fn write_index(&mut self, index: usize, value: T) {
         // TODO match
         let p: *mut T = self.get_mut_ptr(index).unwrap();
         unsafe {
@@ -312,28 +342,26 @@ impl<
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Chunks: [").unwrap();
         for i in 0..self.count {
-
             if i > 0 {
                 write!(f, ", ").unwrap();
             }
             // --> Works improperly; Seems that it frees a pointer obtained, and this cuases an
             // --> issue for Clone types
-            // let val: T = unsafe {
-            //     self.ptr.add(i).read()
-            // };
-            // write!(f, "{}", val).unwrap();
-            //
-            // --> Needs to be added for it to work:
-            // std::mem::forget(val);
+            // unsafe {
+            //     write!(f, "{:}", self.get_ptr(i).unwrap().read()).unwrap();
+            // }
 
             // --> Also doesn't work, because data may be zeroed
             // write!(f, "{}", self[i]).unwrap();
             // --> TODO Add check for whether current memory is assigned with values or not
 
-            // Safety: bounds are OK
-            unsafe {
-                write!(f, "{:}", self.get_ptr(i).unwrap().read()).unwrap();
-            }
+            let val: T = unsafe {
+                self.ptr.add(i).read()
+            };
+            write!(f, "{}", val).unwrap();
+
+            // --> We don't wont to drop a value
+            std::mem::forget(val);
         }
         write!(f, "]")
     }
@@ -346,7 +374,7 @@ impl<
     const BC: bool,
 > Drop for Chunks<T, BC> {
     fn drop(&mut self) {
-        if self.allocated() {
+        if self.allocated() && false {
             self.dealloc();
         }
     }

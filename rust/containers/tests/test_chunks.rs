@@ -26,8 +26,10 @@ mod tests {
     #[test]
     fn test_from_slice() {
         // TODO                   How does it look on IR level?
-        Chunks::<u8>::from_slice(&[1, 2, 3, 4, 5]);
+        Chunks::<u8>::from_slice_copy(&[1, 2, 3, 4, 5]);
     }
+
+    // TODO Test from_slice_clone
 
     #[test]
     fn test_memset() {
@@ -119,35 +121,27 @@ mod tests {
 
     #[test]
     fn test_chunks_to_vec() {
-        let chunks = Chunks::<u8, false>::filled_copy(1, 3);
-        let mut v = unsafe {
-            Vec::from_raw_parts(
-                chunks.ptr,
-                chunks.count,
-                chunks.count,
-            )
-        };
+        let mut v: Vec<u8> = Vec::new();
 
-        assert_eq!(v.as_mut_ptr(), chunks.ptr);
-
-        v[0] = 10;
         v.push(20);
         v.push(20);
         v.push(23);
         v.push(23);
         v.push(28);
         v.push(20);
+        v[0] = 10;
         v.push(22);
         v.shrink_to_fit();
         v.push(21);
 
-        // TODO Is it guaranteed?
-        assert_eq!(v.as_mut_ptr(), chunks.ptr);
+        let mut c: Chunks<u8> = Chunks {
+            ptr: v.as_mut_ptr(),
+            count: v.len(),
+        };
 
-        for i in 0..v.len() {
-            assert_eq!(v[i], chunks[i]);
-        }
-        mem::forget(chunks);
+        assert_eq!(v.as_slice(), c.as_slice());
+        assert_eq!(v.as_mut_slice(), c.as_mut_slice());
+        mem::forget(c);
     }
 
     #[test]
@@ -166,9 +160,10 @@ mod tests {
         let mut chunks = Chunks::<u8>::filled_copy(1, 3);
         // What is &[...] notation? Does it create object on memory?
         assert_eq!(chunks.as_slice(), &[1, 1, 1]);
+        assert_eq!(chunks.as_mut_slice(), &[1, 1, 1]);
 
         chunks[1] = 10;
-        assert_eq!(chunks.as_slice(), &[1, 10, 1]);
+        assert_eq!(chunks.as_mut_slice(), &[1, 10, 1]);
         // TODO more complicated checks
     }
 
@@ -186,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_as_mut_ptr() {
-        let chunks = Chunks::<u8>::filled_copy(1, 3);
+        let mut chunks = Chunks::<u8>::filled_copy(1, 3);
         let ptr: *mut u8 = chunks.as_mut_ptr();
 
         unsafe {
@@ -198,6 +193,7 @@ mod tests {
             ptr.add(2).write(30);
         }
         assert_eq!(chunks.as_slice(), &[10, 20, 30]);
+        assert_eq!(chunks.as_mut_slice(), &[10, 20, 30]);
     }
 
     #[test]
@@ -210,6 +206,40 @@ mod tests {
         //     // let array_ref = &*array_ptr;
         // }
         assert_eq!(array, &[7, 7, 7]);
+    }
+
+    #[test]
+    fn test_debug() {
+        let c = Chunks::<u8>::filled_copy(1, 3);
+        println!("Debug: {:?}", c);
+
+        assert_eq!(c.as_slice(), &[1, 1, 1]);
+
+        // Tests a Debug trait with a T being 'Clone'.
+        // This is important because trying to format a T object located in memory
+        // without disabling auto-drop, will lead to objects destructors being called
+        // in fmt() function.
+        let c: Chunks<String> = Chunks::filled_clone("123".to_string(), 5);
+        println!("Debug: {:?}", c);
+
+        assert_eq!(c.as_slice(), &["123", "123", "123", "123", "123"]);
+    }
+
+    // TEST &str
+    #[test]
+    fn test_str() {
+        // FROM_SLICE (COPY)
+        let c: Chunks<&str> = Chunks::from_slice_copy(&["x", "y", "z"]);
+        assert_eq!(c.as_slice(), &["x", "y", "z"]);
+    }
+
+    // TEST String
+    #[test]
+    fn test_std_string() {
+        // FROM_SLICE (CLONE)
+        let mut c: Chunks<String> = Chunks::from_slice_clone(&["x".to_string(), "y".to_string(), "z".to_string()]);
+        assert_eq!(c.as_slice(), &["x", "y", "z"]);
+        assert_eq!(c.as_mut_slice(), &["x", "y", "z"]);
     }
 
 }
