@@ -374,7 +374,7 @@ impl<
     const BC: bool,
 > Drop for Chunks<T, BC> {
     fn drop(&mut self) {
-        if self.allocated() && false {
+        if self.allocated() {
             self.dealloc();
         }
     }

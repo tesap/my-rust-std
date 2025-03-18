@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::mem::ManuallyDrop;
 use std::ptr;
 use std::ops::{Index, IndexMut};
 use std::ops::{Deref, DerefMut};
@@ -63,7 +64,7 @@ impl<T: Display + Clone> Vector<T> {
     }
 
     // Constructor
-    pub fn from_raw_parts(ptr: *mut T, len: usize, capacity: usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr: *mut T, len: usize, capacity: usize) -> Self {
         Self {
             data: my::Chunks {
                 ptr: ptr,
@@ -81,7 +82,7 @@ impl<T: Display + Clone> Vector<T> {
         self.data.as_ptr()
     }
 
-    pub fn as_mut_ptr(&self) -> *mut T {
+    pub fn as_mut_ptr(&mut self) -> *mut T {
         self.data.as_mut_ptr()
     }
 
@@ -259,3 +260,45 @@ impl<T: Display + Clone> FromIterator<T> for Vector<T> {
         c
     }
 }
+
+// ================== DROP ==================
+
+//impl<T: Display + Clone> Drop for Vector<T> {
+//    fn drop(&mut self) {
+//        drop(self.data);
+//    }
+//}
+
+// ======== FROM & INTO ========
+
+impl<T: Display + Clone> From<Vec<T>> for Vector<T> {
+    fn from(mut value: Vec<T>) -> Self {
+        // Disable drop of Vec
+        let mut value = ManuallyDrop::new(value);
+
+        unsafe {
+            Vector::from_raw_parts(
+                value.as_mut_ptr(),
+                value.len(),
+                value.capacity()
+            )
+        }
+    }
+}
+
+impl<T: Display + Clone> Into<Vec<T>> for Vector<T> {
+    fn into(self) -> Vec<T> {
+        // --> Will lead to dobule-free
+        //let mut _self = self;
+
+        let mut _self = ManuallyDrop::new(self);
+        unsafe {
+            Vec::from_raw_parts(
+                _self.as_mut_ptr(),
+                _self.len(),
+                _self.capacity()
+            )
+        }
+    }
+}
+

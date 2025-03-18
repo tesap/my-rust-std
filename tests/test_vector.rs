@@ -210,4 +210,22 @@ mod tests {
         let v2 = Vector::from_slice_clone(&["x".to_string(), "y".to_string(), "z".to_string()]);
         assert_eq!(v2.as_slice(), &["x", "y", "z"]);
     }
+
+    #[test]
+    fn test_from_std_vec() {
+        let v: Vec<u8> = vec![1, 2, 3, 4, 5];
+        let v2: Vector<u8> = Vector::from(v);
+
+        assert_eq!(v2.as_slice(), &[1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_into_std_vec() {
+        let v: Vec<u8> = {
+            let v2: Vector<u8> = Vector::from_slice_copy(&[1, 2, 3, 4, 5]);
+            v2.into()
+        };
+
+        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
+    }
 }

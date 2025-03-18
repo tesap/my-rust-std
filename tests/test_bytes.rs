@@ -104,4 +104,47 @@ mod tests {
         b3.print();
         b4.print();
     }
+
+    #[test]
+    fn test_from_vec() {
+        let bs: Bytes = {
+            let v: Vector<u8> = Vector::from_slice_copy(&[1, 2, 3, 4, 5]);
+            Bytes::from(v)
+        };
+
+        bs.print();
+        assert_eq!(bs.as_slice(), &[1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_into_vec() {
+        let v: Vector<u8> = {
+            let bs: Bytes = Bytes::from_bytes(&[1, 2, 3, 4, 5]);
+            bs.into()
+        };
+
+        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
+    }
+
+
+    #[test]
+    fn test_from_std_vec() {
+        let bs: Bytes = {
+            let v: Vec<u8> = vec![1, 2, 3, 4, 5];
+            Bytes::from(v)
+        };
+
+        bs.print();
+        assert_eq!(bs.as_slice(), &[1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_into_std_vec() {
+        let v: Vec<u8> = {
+            let bs: Bytes = Bytes::from_bytes(&[1, 2, 3, 4, 5]);
+            bs.into()
+        };
+
+        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
+    }
 }

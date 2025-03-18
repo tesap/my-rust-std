@@ -31,6 +31,7 @@ type Byte = u8;
 
 #[derive(Debug)]
 pub struct Bytes<const BIG_ENDIAN: bool = true>{
+    // TODO Switch to Chunks<Byte>
     pub vec: my::Vector<Byte>
 }
 
@@ -189,5 +190,33 @@ impl<const BE: bool> Bytes<BE> {
         Self {
             vec: v
         }
+    }
+}
+
+impl From<my::Vector<u8>> for Bytes {
+    fn from(value: my::Vector<u8>) -> Self {
+        Self {
+            vec: value
+        }
+    }
+}
+
+impl Into<my::Vector<u8>> for Bytes {
+    fn into(self) -> my::Vector<u8> {
+        self.vec
+    }
+}
+
+impl From<Vec<u8>> for Bytes {
+    fn from(value: Vec<u8>) -> Self {
+        Self {
+            vec: my::Vector::from(value)
+        }
+    }
+}
+
+impl Into<Vec<u8>> for Bytes {
+    fn into(self) -> Vec<u8> {
+        self.vec.into()
     }
 }
