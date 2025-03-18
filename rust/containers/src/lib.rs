@@ -2,4 +2,4 @@
 
 pub mod vector;
 pub mod chunks;
-pub mod bytes2;
+pub mod bytes;

@@ -1,85 +1,194 @@
-use mockall::automock;
-use std::fmt::Debug;
-use std::mem::{size_of, ManuallyDrop};
-use std::ops::Index;
-use std::slice::SliceIndex;
+use crate::vector as my;
+use crate::chunks::Chunks;
+use std::fmt;
+use std::mem;
+use std::ptr;
 
-#[allow(unused)]
-struct Point(i32, i32);
+// === Formats ===
+// bytes: (&[u8]) [x01, xf3, x7d, x19]
+//   This serve as a common ground for all conversions
+// int: (i64) 3485392
+// bin: (str) "01010101010100110"
+// hex: (str) "3bed02d1d149e5336349707ce47d6c90"
 
-#[automock]
-trait BytesOperations {}
+
+fn u8_to_bin(n: &u8) -> Bin {
+    format!("{:08b}", n)
+}
+
+fn bin_to_u8(b: &Bin) -> u8 {
+    u8::from_str_radix(b, 2).expect("Invalid binary string")
+}
+
+fn u8_to_hex(n: &u8) -> String {
+    format!("{:02x}", n)
+}
+
+fn hex_to_u8(h: &str) -> u8 {
+    u8::from_str_radix(h, 16).expect("Invalid hex string")
+}
+
+type Byte = u8;
 
 #[derive(Debug)]
-pub struct Bytes(pub Vec<u8>);
-
-impl<T> From<Vec<T>> for Bytes {
-    fn from(value: Vec<T>) -> Self {
-        let t_size: usize = size_of::<T>();
-        let v_len = value.len() * t_size;
-
-        unsafe {
-            let mut value = ManuallyDrop::new(value);
-            Bytes(Vec::from_raw_parts(
-                value.as_mut_ptr() as *mut u8,
-                v_len,
-                value.capacity(),
-            ))
-        }
-    }
+pub struct Bytes<const BIG_ENDIAN: bool = true>{
+    pub vec: my::Vector<Byte>
 }
 
-impl<T> Into<Vec<T>> for Bytes {
-    fn into(self) -> Vec<T> {
-        // assert_eq!(size_of::<T>(), 1);
-        let from = self.0;
-        let t_size: usize = size_of::<T>();
-        let to_len = from.len() / t_size;
+#[derive(Clone, Debug)]
+pub struct Hex(pub String);
 
-        unsafe {
-            let mut from = ManuallyDrop::new(from);
-            Vec::from_raw_parts(from.as_mut_ptr() as *mut T, to_len, from.capacity())
-        }
-    }
-}
+pub type Bin = String;
 
-impl<const U: usize> Into<Result<[u8; U], String>> for Bytes {
-    fn into(self) -> Result<[u8; U], String> {
-        if self.0.len() > U {
-            return Err(format!("Sizes mismatch: {:} > {:}", self.0.len(), U));
-        }
+#[derive(Debug)]
+pub struct Bins(pub my::Vector<Bin>);
 
-        let as_vec: Vec<u8> = self.into();
-        Ok(std::array::from_fn(|i| as_vec[i]))
-    }
-}
-
-impl Into<String> for Bytes {
+impl Into<String> for &Bins {
     fn into(self) -> String {
-        ";".parse().unwrap()
+        self.0.join(" ")
     }
 }
 
-impl<I: SliceIndex<[u8]>> Index<I> for Bytes {
-    type Output = I::Output;
+pub trait DebugBytes {
+    fn print(&self);
+}
 
-    fn index(&self, index: I) -> &Self::Output {
-        return self.0.index(index);
+impl fmt::Display for Hex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:}", self.0)
     }
 }
 
-// impl<T> Into<&[u8]> for Bytes {
-//     fn into(self) -> &T [u8] {
-//
-//     }
-// }
+impl DebugBytes for Bytes<true> {
+    fn print(&self) {
+        println!("\n----> Bytes: {:?}", self);
+        self.as_slice().print();
+        self.to_int128().unwrap().print();
+        self.to_bin().print();
+        self.to_hex().print();
+        println!();
+    }
+}
 
-impl Into<i64> for Bytes {
-    fn into(self) -> i64 {
-        let max_allowed_length: usize = size_of::<i64>() / size_of::<u8>();
-        assert!(self.0.len() <= max_allowed_length);
+impl DebugBytes for i128 {
+    fn print(&self) {
+        let p: *const i128 = &*self;
 
-        let ptr = self.0.as_ptr() as *const i64;
-        unsafe { ptr.read() }
+        let view: Chunks<Byte> = Chunks {
+            ptr: p as *mut Byte,
+            count: 16
+        };
+        println!("-> i128: {:?}; {:?}", self, view);
+        std::mem::forget(view);
+    }
+}
+
+impl DebugBytes for &[Byte] {
+    fn print(&self) {
+        println!("-> &[u8]: {:?}", self);
+    }
+}
+
+impl DebugBytes for Hex {
+    fn print(&self) {
+        println!("-> Hex: {:?}", self.0);
+    }
+}
+
+impl DebugBytes for Bins {
+    fn print(&self) {
+        let s: String = self.into();
+        println!("-> Bins: [{:}]", s);
+    }
+}
+
+impl<const BE: bool> Bytes<BE> {
+    pub fn as_slice(&self) -> &[Byte] {
+        self.vec.as_slice()
+    }
+
+    pub fn to_int128(&self) -> Result<i128, String> {
+        let s1 = size_of::<i128>();
+        let s2 = self.vec.len_bytes();
+
+        if s2 > s1 {
+            return Err("Bytes length is too big".to_string());
+        }
+
+        let ptr: *const i128 = self.vec.as_ptr() as *const i128;
+        unsafe {
+            Ok(*ptr)
+        }
+    }
+
+    pub fn to_bin(&self) -> Bins {
+        let v: my::Vector<Bin> = self.vec.iter().map(u8_to_bin).collect();
+        let a = Bins(v);
+        a
+    }
+
+    pub fn to_hex(&self) -> Hex {
+        let hex_string = self.vec.iter()
+            .map(u8_to_hex)
+            .collect::<String>();
+        Hex(hex_string)
+    }
+
+    pub fn from_bytes(from: &[Byte]) -> Self {
+        Self {
+            vec: my::Vector::from_slice_copy(from)
+        }
+    }
+
+    // WHAT? If we pass 'from' by value, further from_slice fails with error referencing
+    // i.e. value is dropped (right?)
+    pub fn from_int(from: &i128) -> Self {
+        // Direct cast doesn't work, but intermediate does
+        let ptr: *const i128 = from;
+        // Casting from const to mut is legal
+        let ptr_u8: *mut u8 = ptr as *mut u8;
+
+        // Why *mut type is needed?
+        let size: usize = mem::size_of::<i128>() / mem::size_of::<Byte>();
+
+        // --> Doesnt work
+        // let slice: *const [Byte] = ptr as *const [Byte];
+
+        // --> Is it prefferred option over direct slice constructor?
+        // Constructing wide pointer
+        // let nn_ptr = ptr::NonNull::new(ptr_u8).unwrap();
+        //let slice = unsafe {
+        //    ptr::NonNull::slice_from_raw_parts(nn_ptr, size).as_mut()
+        //};
+
+        // TODO Chunks
+        // --> Manually create slice
+        let slice = unsafe {
+            std::slice::from_raw_parts(ptr_u8, size)
+        };
+
+        Self {
+            vec: my::Vector::from_slice_copy(slice)
+        }
+    }
+
+    pub fn from_bins(from: &Bins) -> Self {
+        let bytes: my::Vector<Byte> = from.0.iter().map(bin_to_u8).collect();
+        Self {
+            vec: bytes
+        }
+    }
+
+    pub fn from_hex(from: &Hex) -> Self {
+        let mut v: my::Vector<Byte> = my::Vector::new();
+        for i in (0..from.0.len()).step_by(2) {
+            // What is &x[..] expression?
+            let b: u8 = hex_to_u8(&from.0[i..i+2]);
+            v.push(b);
+        }
+
+        Self {
+            vec: v
+        }
     }
 }
