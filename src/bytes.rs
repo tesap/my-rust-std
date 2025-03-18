@@ -2,7 +2,6 @@ use crate::vector as my;
 use crate::chunks::Chunks;
 use std::fmt;
 use std::mem;
-use std::ptr;
 
 // === Formats ===
 // bytes: (&[u8]) [x01, xf3, x7d, x19]
