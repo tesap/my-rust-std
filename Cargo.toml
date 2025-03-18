@@ -1,17 +1,19 @@
 [package]
-name = "containers"
-version = "0.1.0"
+name = "tesap-std"
+version = "0.1.2"
 edition = "2024"
+description = "Reimplementation of Rust's common std containers"
+repository = "https://github.com/tesap/my-rust-std"
+readme = "README.md"
+license = "MIT"
+keywords = ["containers", "std", "vector", "bytes"]
+categories = ["memory-management"]
 
 [dependencies]
 all_asserts = "2.3.3"
 assert-panic = "1.0.1"
-# paste = "1.0.15"
 
 # [lib]
 # name = "containers"
 # path = "src/lib.rs"
 
-# [[bin]]
-# name = "containers"
-# path = "src/main.rs"
