@@ -10,7 +10,7 @@ macro_rules! test_parametrized {
 
 #[cfg(test)]
 mod tests {
-    use tesap_std::chunks::Chunks;
+    use tesap_std::Chunks;
     use assert_panic::assert_panic;
     use std::mem;
 

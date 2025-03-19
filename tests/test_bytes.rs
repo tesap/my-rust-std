@@ -10,8 +10,8 @@ macro_rules! test_parametrized_sample {
 
 #[cfg(test)]
 mod tests {
-    use tesap_std::bytes::{Bins, Bytes, Hex, Bin, DebugBytes};
-    use tesap_std::vector::Vector;
+    use tesap_std::{Bins, Bytes, Hex, Bin, DebugBytes};
+    use tesap_std::Vector;
 
     struct TestSample<'a>{
         bytes: &'a [u8],

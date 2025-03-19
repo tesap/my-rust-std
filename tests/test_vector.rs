@@ -1,8 +1,7 @@
 
 #[cfg(test)]
 mod tests {
-    use tesap_std::vector::Vector;
-    use tesap_std::vector::ConsecConstrucor;
+    use tesap_std::{Vector, ConsecConstrucor};
     use all_asserts::{assert_false};
     use assert_panic::assert_panic;
 

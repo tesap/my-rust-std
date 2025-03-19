@@ -1,7 +1,7 @@
-pub mod vector;
-pub mod chunks;
-pub mod bytes;
+mod vector;
+mod chunks;
+mod bytes;
 
-pub use vector::Vector;
+pub use vector::{Vector, ConsecConstrucor};
 pub use chunks::Chunks;
-pub use bytes::Bytes;
+pub use bytes::{Bins, Bytes, Hex, Bin, DebugBytes};
