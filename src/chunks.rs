@@ -1,335 +1,81 @@
-use std::alloc;
 use std::ptr;
-use std::mem;
+//use std::mem;
 use std::fmt;
-use core::slice;
+//use core::slice;
 use std::ops::{Index, IndexMut};
 use std::fmt::Display;
 
-type Layout = alloc::Layout;
-
-fn array_layout<T>(count: usize) -> Layout {
-    let layout = alloc::Layout::array::<T>(count).unwrap();
-    assert_ne!(layout.size(), 0);
-    assert_eq!(layout.size(), count * mem::size_of::<T>());
-    layout
-}
-
-// TODO Add Option for error case
-fn array_alloc<T>(count: usize) -> *mut T {
-    let layout = array_layout::<T>(count);
-
-    unsafe {
-        alloc::alloc(layout) as *mut T
-    }
-}
-
-fn array_realloc<T>(ptr: *mut T, count: usize, new_count: usize) -> *mut T {
-    if new_count == count {
-        return ptr;
-    }
-
-    let layout = array_layout::<T>(count);
-
-    unsafe {
-        alloc::realloc(
-            ptr as *mut u8,
-            layout,
-            array_layout::<T>(new_count).size()
-        ) as *mut T
-    }
-}
-
-fn array_dealloc<T>(ptr: *mut T, count: usize) {
-    // Safety: memory was allocated with same pointer and layout alignment
-    unsafe {
-        alloc::dealloc(
-            ptr as *mut u8,
-            array_layout::<T>(count)
-        )
-    }
-}
-
+// mod mem_utils;
+use crate::mem_utils::{array_alloc, array_realloc, array_dealloc};
 
 pub struct Chunks<T: Clone, const BOUNDS_CHECK: bool = true>
 {
+    // TODO Option<> + ? (In Safety section)
     pub ptr: *mut T,
-    pub count: usize,
-}
-
-impl<
-    T: Copy + Clone,
-    const BC: bool,
-> Chunks<T, BC> {
-
-    pub fn memset_copy(&mut self, value: T) {
-        for i in 0..self.count {
-            // ptr::write(self.ptr.add(i), value);
-            self[i] = value;
-        }
-    }
-
-    // Constructor
-    pub fn filled_copy(value: T, count: usize) -> Self {
-        let mut c: Self = Self::alloc(count);
-        c.memset_copy(value);
-        c
-    }
-
-    pub fn from_slice_copy(from: &[T]) -> Self {
-        let count: usize = from.len();
-        let c = Self::alloc(count);
-
-        // --> Would work, but only for Copy types
-        if count > 0 {
-            unsafe {
-                ptr::copy(from.as_ptr(), c.ptr, count)
-            }
-        }
-
-        c
-    }
+    pub cap: usize,
+    pub len: usize,
 }
 
 impl<
     T: Clone + Display,
     const BC: bool,
 > Chunks<T, BC> {
-    pub fn memset_clone(&mut self, value: T) {
-        for i in 0..self.count {
-            // Err: invalid memory reference
-            // self[i] = value.clone();
-
-            self.write_index(i, value.clone());
+    pub fn new() -> Self {
+        Self {
+            ptr: array_alloc::<T>(1),
+            cap: 1,
+            len: 0,
         }
     }
-
-    // Constructor
-    // TODO Can we reuse one by another
-    pub fn filled_clone(value: T, count: usize) -> Self {
-        let mut c: Self = Self::alloc(count);
-        c.memset_clone(value);
-        c
-    }
-
 }
-
-impl<
-    T: Clone + Display,
-    const BC: bool,
-> Chunks<T, BC> {
-    pub fn from_slice_clone(from: &[T]) -> Self {
-        let count: usize = from.len();
-        let mut c = Self::alloc(count);
-
-        // --> Doesn't work: String-like structs gets double freed
-        //if count > 0 {
-        //    unsafe {
-        //        ptr::copy(from.as_ptr(), c.ptr, count)
-        //    }
-        //}
-        // std::mem::forget(from.as_ptr());
-
-        for i in 0..count {
-            // We are obliged to clone
-            // Using write_index because memory is zeroed
-            c.write_index(i, from[i].clone())
-        }
-
-        c
-    }
-}
-
 
 impl<
     T: Clone,
     const BC: bool,
 > Chunks<T, BC> {
-    // Constructor
-    pub fn alloc(count: usize) -> Self {
-        Self {
-            ptr: array_alloc::<T>(count),
-            count,
-        }
-    }
-
     pub fn dealloc(&mut self) {
-        if self.allocated() {
-            array_dealloc(self.ptr, self.count);
+        if !self.allocated() {
+            panic!("Could not dealloc not allocated");
+            return;
         }
 
-        self.ptr = ptr::null::<T>() as *mut T;
-        self.count = 0;
+        // Dropping initialized values
+        for i in 0..self.len {
+            unsafe {
+                ptr::drop_in_place(self.ptr.add(i) as *mut T);
+            }
+        }
+
+        array_dealloc(self.ptr, self.cap);
+        self.cap = 0;
     }
 
-    pub fn realloc(&mut self, new_count: usize) {
-        if self.allocated() {
-            self.ptr = array_realloc(self.ptr, self.count, new_count);
-        } else {
-            self.ptr = array_alloc(new_count);
+    pub fn realloc(&mut self, new_cap: usize) {
+        if !self.allocated() {
+            panic!("Not allocated for realloc");
         }
-        self.count = new_count;
+
+        self.ptr = array_realloc(self.ptr, self.cap, new_cap);
+        self.cap = new_cap;
     }
 
     pub fn grow(&mut self, delta: usize) {
         if !self.allocated() {
-            // Copy is in action? How efficiently?
-            // self = Self::alloc(delta);
             return;
         }
-        self.realloc(self.count + delta);
+        self.realloc(self.cap + delta);
     }
 
-    pub fn allocated(&self) -> bool {
-        !self.ptr.is_null() && self.count > 0
-    }
-
-    pub fn as_ptr(&self) -> *const T {
-        self.ptr as *const T
-    }
-
-    pub fn as_mut_ptr(&self) -> *mut T {
-        self.ptr
-    }
-
-    pub fn as_array<const N: usize>(&self) -> Option<&[T; N]> {
-        if N != self.count {
-            None
-        } else {
-            // Doesnt work
-            // &self.ptr as &[T; N]
-            let ptr = self.as_ptr() as *const [T; N];
-            unsafe {
-                Some(&*ptr)
-            }
-        }
-    }
-
-    pub fn as_slice(&self) -> &[T] {
-        unsafe {
-            slice::from_raw_parts(self.ptr, self.count)
-        }
-    }
-
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe {
-            std::slice::from_raw_parts_mut(self.ptr, self.count)
-        }
-    }
-
-    pub fn indices(&self) -> std::ops::Range<usize> {
-        0..self.count
-    }
-
-    // Private
+    // === Private ===
     fn bounds(&self, index: usize) -> bool {
         match BC {
             false => true,
-            true => 0 <= index && index < self.count,
+            true => /*0 <= index &&*/ index < self.len,
         }
     }
 
-    /// Replaces mutable acces via index like `self.data[self.len] = elem`
-    /// by providing an access to an element via pointer `*mut T`
-    /// rather than reference `&mut T`
-    ///
-    /// This is made for objects with custom Drop trait (such as String):
-    /// Trying to overwrite memory location by `&T` reference (returned by index_mut)
-    /// causes invokation of drop().
-    /// But this is unwanted behaviour for memory without an actual object
-    /// and will lead to "invalid memory reference" error in this case.
-    pub fn write_index(&mut self, index: usize, value: T) {
-        // TODO match
-        let p: *mut T = self.get_mut_ptr(index).unwrap();
-        unsafe {
-            p.write(value);
-        }
-    }
-
-    // === PRIVATE ===
-    fn get_ptr(&self, index: usize) -> Result<*const T, &'static str> {
-        // Safety: Out-of-bounds is checked
-        if self.bounds(index) {
-            unsafe {
-                Ok(self.ptr.add(index) as *const T)
-            }
-        } else {
-            Err("Index out of bounds")
-        }
-    }
-
-    fn get_mut_ptr(&mut self, index: usize) -> Result<*mut T, &'static str> {
-        // Safety: Out-of-bounds is checked
-        if self.bounds(index) {
-            unsafe {
-                Ok(self.ptr.add(index))
-            }
-        } else {
-            Err("Index out of bounds")
-        }
-    }
-
-    //
-    //fn get(&self, index: usize) -> Result<&T, &'static str> {
-    //    // Safety: Out-of-bounds is checked
-    //    if self.bounds(index) {
-    //        unsafe {
-    //            // TODO Maybe return by reference?
-    //            // Does &mut *... is a borrowing, i.e. moving?
-    //            // Looks like overhead of moving twice
-    //            Ok(&*self.ptr.add(index))
-    //        }
-    //    } else {
-    //        Err("Index out of bounds")
-    //    }
-    //}
-
-    fn get_mut(&mut self, index: usize) -> Result<&mut T, &'static str> {
-        // TODO Check overheads of such solution
-        // May it be done better?
-        //match self.get(index) {
-        //    // === Error: [E0605]: non-primitive cast: `&T` as `&mut T`
-        //    Ok(value) => Ok(value as &mut T),
-        //    Err(err) => panic!("{}", err),
-        //}
-
-        if self.bounds(index) {
-            // Safety: Out-of-bounds is checked
-            unsafe {
-                Ok(&mut *self.ptr.add(index))
-            }
-        } else {
-            Err("Index out of bounds")
-        }
-    }
-    // TODO is it right approach in Rust to have mut & const function's duplicates?
-}
-
-// ================== INDEX & INDEX_MUT ==================
-// TODO Seems that cannot use self[i] = string1; // (String)
-// Because returning a reference to a non-existing type value
-
-impl<
-    T: Clone,
-    const BC: bool,
-> Index<usize> for Chunks<T, BC> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        unsafe {
-            &*self.get_ptr(index).unwrap()
-        }
-    }
-}
-
-impl<
-    T: Clone,
-    const BC: bool,
-> IndexMut<usize> for Chunks<T, BC> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        unsafe {
-            &mut *self.get_mut_ptr(index).unwrap()
-        }
+    pub fn allocated(&self) -> bool {
+        self.cap > 0
     }
 }
 
@@ -341,21 +87,14 @@ impl<
 > fmt::Debug for Chunks<T, BC> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Chunks: [").unwrap();
-        for i in 0..self.count {
+        for i in 0..self.cap {
             if i > 0 {
                 write!(f, ", ").unwrap();
             }
-            // --> Works improperly; Seems that it frees a pointer obtained, and this cuases an
-            // --> issue for Clone types
-            // unsafe {
-            //     write!(f, "{:}", self.get_ptr(i).unwrap().read()).unwrap();
-            // }
 
-            // --> Also doesn't work, because data may be zeroed
-            // write!(f, "{}", self[i]).unwrap();
-            // --> TODO Add check for whether current memory is assigned with values or not
-
+            // Todo replace with val = *ptr
             let val: T = unsafe {
+                // Move
                 self.ptr.add(i).read()
             };
             write!(f, "{}", val).unwrap();
@@ -374,6 +113,7 @@ impl<
     const BC: bool,
 > Drop for Chunks<T, BC> {
     fn drop(&mut self) {
+        println!("CHUNKS DROP: {:}, {:}", self.len, self.cap);
         if self.allocated() {
             self.dealloc();
         }
