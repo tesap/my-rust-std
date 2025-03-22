@@ -1,7 +1,6 @@
-mod vector;
-mod chunks;
-mod bytes;
+#![feature(default_field_values)]
 
-pub use vector::{Vector, ConsecConstrucor};
+mod chunks;
+mod mem_utils;
+
 pub use chunks::Chunks;
-pub use bytes::{Bins, Bytes, Hex, Bin, DebugBytes};
