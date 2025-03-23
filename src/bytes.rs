@@ -30,7 +30,7 @@ type Byte = u8;
 
 #[derive(Debug)]
 pub struct Bytes<const BIG_ENDIAN: bool = true>{
-    // TODO Switch to Chunks<Byte>
+    // TODO Switch to Vector<Byte>
     pub vec: Vector<Byte>
 }
 
@@ -161,7 +161,6 @@ impl<const BE: bool> Bytes<BE> {
         //    ptr::NonNull::slice_from_raw_parts(nn_ptr, size).as_mut()
         //};
 
-        // TODO Chunks
         // --> Manually create slice
         let slice = unsafe {
             std::slice::from_raw_parts(ptr_u8, size)
