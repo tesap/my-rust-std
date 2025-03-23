@@ -1,6 +1,8 @@
 #![feature(default_field_values)]
 
-mod chunks;
+mod vector;
 mod mem_utils;
 
-pub use chunks::Chunks;
+
+pub mod bytes;
+pub use vector::Vector;

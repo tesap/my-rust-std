@@ -8,36 +8,18 @@ macro_rules! test_parametrized {
     }
 }
 
-// Limitation of Rust
-//struct Cloneable{
-//    pub cloned_cnt: i32 = 0
-//};
-//
-//impl Cloneable {
-//    fn new() -> Self {
-//        Self {
-//            cloned_cnt: 0
-//        }
-//    }
-//}
-//
-//impl Clone for Cloneable {
-//    fn clone(&self) -> Self {
-//        self.cloned_cnt += 1;
-//        Self::new()
-//    }
-//}
-
 #[cfg(test)]
 mod tests {
-    use tesap_std::Chunks;
+    use tesap_std::Vector as Chunks;
     use assert_panic::assert_panic;
     // use std::mem;
 
+    // === Constructors
     #[test]
     fn test_new_init_trivial_type() {
         let mut chunks = Chunks::<u32>::new_init(3, &10);
         assert_eq!(chunks.as_slice(), &[10, 10, 10]);
+        assert_eq!(chunks.len(), 3);
     }
 
     #[test]
@@ -46,6 +28,51 @@ mod tests {
         let mut chunks = Chunks::<String>::new_init(3, &s);
     }
 
+    #[test]
+    fn test_new_empty() {
+        let mut v: Chunks<i32> = Chunks::new(0);
+        assert_eq!(v.len(), 0);
+        assert_eq!(v.capacity(), 1);
+    }
+
+    // === Operations
+    #[test]
+    fn test_pop_till_empty() {
+        let mut v = Chunks::new_init(3, &1);
+        assert_eq!(v.len(), 3);
+        assert_eq!(v.pop(), Some(1));
+        assert_eq!(v.len(), 2);
+        assert_eq!(v.pop(), Some(1));
+        assert_eq!(v.len(), 1);
+        assert_eq!(v.pop(), Some(1));
+        assert_eq!(v.len(), 0);
+        assert_eq!(v.pop(), None);
+    }
+
+    #[test]
+    fn test_push_empty() {
+        let mut v = Chunks::new_init(0, &0);
+        assert_eq!(v.push(1), true);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v.capacity(), 1);
+    }
+
+    #[test]
+    fn test_push_multiple() {
+        let mut v = Chunks::new_init(5, &10);
+
+        assert_eq!(v.push(100), true);
+        assert_eq!(v.len, 6);
+        assert_eq!(v[v.len - 1], 100);
+        assert_eq!(v.push(101), true);
+        assert_eq!(v.len, 7);
+        assert_eq!(v[v.len - 1], 101);
+        assert_eq!(v.push(102), true);
+        assert_eq!(v.len, 8);
+        assert_eq!(v[v.len - 1], 102);
+    }
+
+    // === Index
     #[test]
     fn test_as_slice_str() {
         let mut s = String::from("asdf");
@@ -107,58 +134,38 @@ mod tests {
         assert_panic!({ chunks[3]; });
     }
 
-    //
-    //fn test_reinterpret<T>()
-    //where
-    //    T: Copy + std::fmt::Debug + std::cmp::PartialEq + From<u8>
-    //{
-    //    let SIZE = 20;
-    //    let VALUE: T = 100.into();
-    //    let size_factor: usize = mem::size_of::<T>() / mem::size_of::<u8>();
-    //    let mut chunks = Chunks::<T>::alloc(SIZE);
-    //    chunks.memset_copy(VALUE.into());
-    //    assert_eq!(chunks[0], VALUE);
-    //
-    //    let chunks_view: Chunks::<T, false> = Chunks {
-    //        ptr: chunks.ptr,
-    //        count: chunks.count
-    //    };
-    //    /*
-    //     * Check that no further allocation happenned out of bounds
-    //     */
-    //    assert_ne!(chunks_view[chunks.count], VALUE);
-    //    mem::forget(chunks_view);
-    //
-    //    let ptr = chunks.ptr as *mut u8;
-    //    // BOUNDS_CHECK = false : Turn off as needed to exceed bounds intentionally further
-    //    let chunks2: Chunks<u8, false> = Chunks {
-    //        ptr: ptr,
-    //        count: SIZE * size_factor,
-    //    };
-    //
-    //    /*
-    //     * Checking that VALUE is present in first byte of each chunk
-    //     */
-    //    chunks2.indices().for_each(|i| {
-    //        if i % size_factor == 0 {
-    //            // TODO What?!
-    //            assert_eq!(<u8 as Into<T>>::into(chunks2[i]), VALUE, "(i: {i}) First byte in chunk is to be {VALUE:?}");
-    //        } else {
-    //            assert_eq!(<u8 as Into<T>>::into(chunks2[i]), 0.into(), "(i: {i}) Rest part of chunk is to be 0");
-    //        }
-    //    });
-    //    // DROP = false : Double-free is possible, so do not treat it as allocated
-    //    mem::forget(chunks2);
-    //}
-    //
-    //test_parametrized!(test_reinterpret, test_reinterpret_u8, u8);
-    //test_parametrized!(test_reinterpret, test_reinterpret_u16, u16);
-    //test_parametrized!(test_reinterpret, test_reinterpret_u32, u32);
-    //test_parametrized!(test_reinterpret, test_reinterpret_i16, i16);
-    //test_parametrized!(test_reinterpret, test_reinterpret_i32, i32);
-    //test_parametrized!(test_reinterpret, test_reinterpret_i64, i64);
+    // === as_slice
+    
+    #[test]
+    fn test_as_slice() {
+        let mut chunks = Chunks::<u8>::new_init(3, &1);
+        // What is &[...] notation? Does it create object on memory?
+        assert_eq!(chunks.as_slice(), &[1, 1, 1]);
+        // assert_eq!(chunks.as_mut_slice(), &[1, 1, 1]);
 
+        chunks[1] = 10;
+        assert_eq!(chunks.as_slice(), &[1, 10, 1]);
+    }
 
+    #[test]
+    fn test_as_slice_operations() {
+        let mut v = Chunks::new_init(5, &1);
+        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1]);
+
+        v.push(10);
+        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1, 10]);
+
+        v.push(10);
+        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1, 10, 10]);
+
+        assert_eq!(v.pop(), Some(10));
+        assert_eq!(v.as_slice(), &[1, 1, 1, 1, 1, 10]);
+
+        v[1] = 100;
+        assert_eq!(v.as_slice(), &[1, 100, 1, 1, 1, 10]);
+    }
+
+    // === Interop with std containers
     #[test]
     fn test_chunks_to_std_vec_from_raw_parts() {
         // For u8
@@ -201,17 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn test_as_slice() {
-        let mut chunks = Chunks::<u8>::new_init(3, &1);
-        // What is &[...] notation? Does it create object on memory?
-        assert_eq!(chunks.as_slice(), &[1, 1, 1]);
-        // assert_eq!(chunks.as_mut_slice(), &[1, 1, 1]);
-
-        chunks[1] = 10;
-        assert_eq!(chunks.as_slice(), &[1, 10, 1]);
-    }
-
-    #[test]
     fn test_debug() {
         let c = Chunks::<u8>::new_init(3, &1);
         println!("Debug: {:?}", c);
@@ -247,9 +243,75 @@ mod tests {
     fn test_std_string() {
         // FROM_SLICE (CLONE)
         let mut c: Chunks<String> = Chunks::from_slice_clone(&["x".to_string(), "y".to_string(), "z".to_string()]);
-        //assert_eq!(c.as_slice(), &["x", "y", "z"]);
-        //std::mem::forget(c);
+        assert_eq!(c.as_slice(), &["x", "y", "z"]);
+        std::mem::forget(c);
     }
 
+
+    // ==== From & Into ====
+    #[test]
+    fn test_from_std_vec() {
+        let v: Vec<u8> = vec![1, 2, 3, 4, 5];
+        let v2: Chunks<u8> = Chunks::from(v);
+
+        assert_eq!(v2.as_slice(), &[1, 2, 3, 4, 5]);
+
+        // &str literal
+        let v: Vec<&str> = vec!["x", "y", "z"];
+        let v2: Chunks<&str> = Chunks::from(v);
+
+        assert_eq!(v2.as_slice(), &["x", "y", "z"]);
+    }
+
+    #[test]
+    fn test_into_std_vec() {
+        let v: Vec<u8> = {
+            let v2: Chunks<u8> = Chunks::from_slice_copy(&[1, 2, 3, 4, 5]);
+            v2.into()
+        };
+
+        assert_eq!(v.as_slice(), &[1, 2, 3, 4, 5]);
+
+        // &str literal
+        let v: Chunks<&str> = Chunks::from_slice_clone(&["x", "y", "z"]);
+        let v2: Vec<&str> = v.into();
+
+        assert_eq!(v2.as_slice(), &["x", "y", "z"]);
+    }
+
+    // ==== Deref ====
+
+    #[test]
+    fn test_deref() {
+        let v: Chunks<i32> = Chunks::new_init(5, &1);
+
+        // assert_eq!(&*v, &[1, 1, 1, 1, 1]);
+        // let deref: [i32] = *v; // as [i32; 10];
+        // TODO What is [T] type? How can it be used without reference?
+
+        assert_panic!({ (&*v)[100]; });
+    }
+
+    #[test]
+    fn test_deref_iter() {
+        let v: Chunks<usize> = Chunks::from_slice_copy(&[1, 2, 3, 4, 5]);
+
+        // TODO How does it automatically gives iter()?
+        let v2: Vec<usize> = v.iter()
+            .map(|el| { el * el })
+            // Requires FromIterator
+            .collect();
+
+        assert_eq!(v2.as_slice(), &[1, 4, 9, 16, 25]);
+    }
+
+    #[test]
+    fn test_deref_join() {
+        let mut v: Chunks<String> = Chunks::new(0);
+        v.push("12".to_string());
+        v.push("34".to_string());
+        v.push("56".to_string());
+        assert_eq!(v.join("|"), "12|34|56");
+    }
 }
 

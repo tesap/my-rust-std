@@ -39,15 +39,6 @@ pub unsafe fn array_init<T: Clone>(ptr: *mut T, size: usize, init_value: &T) {
     }
 }
 
-//pub fn array_alloc_default<T: Default + Clone>(size: usize) -> *mut T {
-//    let ptr = array_alloc(size);
-//    unsafe {
-//        array_init(ptr, size, &T::default());
-//    }
-//    ptr
-//}
-
-
 // Dropping initialized values
 pub unsafe fn array_deinit<T>(ptr: *mut T, size: usize) {
     println!("ARRAY_DEINIT: {:}", size);
@@ -73,13 +64,13 @@ pub unsafe fn array_realloc<T>(ptr: *mut T, size: usize, new_size: usize) -> *mu
     }
 }
 
-// Not &T, because clone is done outside if needed
-pub unsafe fn array_write<T>(ptr: *mut T, index: usize, value: T) {
+// Safety: a caller must ensure that memory at ptr[index] is NOT initialized
+pub unsafe fn array_write_no_drop<T>(ptr: *mut T, index: usize, value: T) {
     // Moves `value` here
     ptr.add(index).write(value);
 }
 
-// Safety: a caller must ensure there initialized value at ptr[index]
+// Safety: a caller must ensure that memory at ptr[index] is initialized
 pub unsafe fn array_write_drop<T>(ptr: *mut T, index: usize, value: T) {
     *ptr.add(index) = value
 }

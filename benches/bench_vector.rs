@@ -4,14 +4,14 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use containers::vector::Vector;
+    use tesap_std::Vector;
     use test::Bencher;
 
     // ===== NEW =====
     #[bench]
     fn bench_new(b: &mut Bencher) {
         b.iter(|| {
-            let v: Vector<i32> = Vector::new(0, 10000);
+            let v: Vector<i32> = Vector::new_init(10000, &0);
             test::black_box(v);
         });
     }
@@ -27,7 +27,7 @@ mod tests {
     // ===== APPEND =====
     #[bench]
     fn bench_append(b: &mut Bencher) {
-        let mut v: Vector<i32> = Vector::new(0, 0);
+        let mut v: Vector<i32> = Vector::new(0);
         b.iter(|| {
             v.push(1);
             test::black_box(&v);
@@ -44,29 +44,10 @@ mod tests {
         });
     }
 
-    // ===== INSERT =====
-    #[bench]
-    fn bench_insert(b: &mut Bencher) {
-        let mut v: Vector<i32> = Vector::new(0, 10);
-        b.iter(|| {
-            v.insert(5, 1);
-            test::black_box(&v);
-        });
-    }
-
-    #[bench]
-    fn bench_insert_std(b: &mut Bencher) {
-        let mut v: Vec<i32> = vec![0; 10];
-        b.iter(|| {
-            v.insert(5, 1);
-            test::black_box(&v);
-        });
-    }
-
     // ===== POP =====
     #[bench]
     fn bench_pop(b: &mut Bencher) {
-        let mut v: Vector<i32> = Vector::new(0, 10000);
+        let mut v: Vector<i32> = Vector::new_init(10000, &0);
         b.iter(|| {
             v.pop();
             test::black_box(&v);
@@ -85,7 +66,7 @@ mod tests {
     // ===== INDEX =====
     #[bench]
     fn bench_index(b: &mut Bencher) {
-        let v: Vector<i32> = Vector::new(0, 1000);
+        let v: Vector<i32> = Vector::new_init(1000, &0);
         b.iter(|| {
             let elem = v[500];
             test::black_box(elem);
@@ -104,7 +85,7 @@ mod tests {
     // ===== INDEX MUT =====
     #[bench]
     fn bench_index_mut(b: &mut Bencher) {
-        let mut v: Vector<i32> = Vector::new(0, 1000);
+        let mut v: Vector<i32> = Vector::new_init(1000, &0);
         b.iter(|| {
             v[500] = 1;
             test::black_box(&v);

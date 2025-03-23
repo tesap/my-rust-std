@@ -1,5 +1,4 @@
-use crate::vector as my;
-use crate::chunks::Chunks;
+use crate::Vector;
 use std::fmt;
 use std::mem;
 
@@ -32,7 +31,7 @@ type Byte = u8;
 #[derive(Debug)]
 pub struct Bytes<const BIG_ENDIAN: bool = true>{
     // TODO Switch to Chunks<Byte>
-    pub vec: my::Vector<Byte>
+    pub vec: Vector<Byte>
 }
 
 #[derive(Clone, Debug)]
@@ -41,7 +40,7 @@ pub struct Hex(pub String);
 pub type Bin = String;
 
 #[derive(Debug)]
-pub struct Bins(pub my::Vector<Bin>);
+pub struct Bins(pub Vector<Bin>);
 
 impl Into<String> for &Bins {
     fn into(self) -> String {
@@ -74,9 +73,10 @@ impl DebugBytes for i128 {
     fn print(&self) {
         let p: *const i128 = &*self;
 
-        let view: Chunks<Byte> = Chunks {
+        let view: Vector<Byte> = Vector {
             ptr: p as *mut Byte,
-            count: 16
+            cap: 16,
+            len: 16,
         };
         println!("-> i128: {:?}; {:?}", self, view);
         std::mem::forget(view);
@@ -115,14 +115,14 @@ impl<const BE: bool> Bytes<BE> {
             return Err("Bytes length is too big".to_string());
         }
 
-        let ptr: *const i128 = self.vec.as_ptr() as *const i128;
         unsafe {
-            Ok(*ptr)
+            let ptr: *const i128 = self.vec.as_ptr() as *const i128;
+            Ok(ptr.read())
         }
     }
 
     pub fn to_bin(&self) -> Bins {
-        let v: my::Vector<Bin> = self.vec.iter().map(u8_to_bin).collect();
+        let v: Vector<Bin> = self.vec.iter().map(u8_to_bin).collect();
         let a = Bins(v);
         a
     }
@@ -136,7 +136,7 @@ impl<const BE: bool> Bytes<BE> {
 
     pub fn from_bytes(from: &[Byte]) -> Self {
         Self {
-            vec: my::Vector::from_slice_copy(from)
+            vec: Vector::from_slice_copy(from)
         }
     }
 
@@ -168,19 +168,19 @@ impl<const BE: bool> Bytes<BE> {
         };
 
         Self {
-            vec: my::Vector::from_slice_copy(slice)
+            vec: Vector::from_slice_copy(slice)
         }
     }
 
     pub fn from_bins(from: &Bins) -> Self {
-        let bytes: my::Vector<Byte> = from.0.iter().map(bin_to_u8).collect();
+        let bytes: Vector<Byte> = from.0.iter().map(bin_to_u8).collect();
         Self {
             vec: bytes
         }
     }
 
     pub fn from_hex(from: &Hex) -> Self {
-        let mut v: my::Vector<Byte> = my::Vector::new();
+        let mut v: Vector<Byte> = Vector::new(0);
         for i in (0..from.0.len()).step_by(2) {
             // What is &x[..] expression?
             let b: u8 = hex_to_u8(&from.0[i..i+2]);
@@ -193,16 +193,16 @@ impl<const BE: bool> Bytes<BE> {
     }
 }
 
-impl From<my::Vector<u8>> for Bytes {
-    fn from(value: my::Vector<u8>) -> Self {
+impl From<Vector<u8>> for Bytes {
+    fn from(value: Vector<u8>) -> Self {
         Self {
             vec: value
         }
     }
 }
 
-impl Into<my::Vector<u8>> for Bytes {
-    fn into(self) -> my::Vector<u8> {
+impl Into<Vector<u8>> for Bytes {
+    fn into(self) -> Vector<u8> {
         self.vec
     }
 }
@@ -210,7 +210,7 @@ impl Into<my::Vector<u8>> for Bytes {
 impl From<Vec<u8>> for Bytes {
     fn from(value: Vec<u8>) -> Self {
         Self {
-            vec: my::Vector::from(value)
+            vec: Vector::from(value)
         }
     }
 }
@@ -218,5 +218,13 @@ impl From<Vec<u8>> for Bytes {
 impl Into<Vec<u8>> for Bytes {
     fn into(self) -> Vec<u8> {
         self.vec.into()
+    }
+}
+
+impl Default for Bytes {
+    fn default() -> Self {
+        Self {
+            vec: Vector::new(0),
+        }
     }
 }
